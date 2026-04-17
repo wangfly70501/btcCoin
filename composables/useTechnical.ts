@@ -227,23 +227,22 @@ export function useTechnical() {
     let direction: 'long' | 'short' | 'wait' = signal.cls
 
     if (direction === 'long') {
-      // SL = 1×ATR below entry zone (tight but outside noise)
       slPrice = entryLow - atr * 0.8
-      tp1Price = entryRef + atr * 2    // 2× ATR reward
-      tp2Price = Math.max(bbUpper, entryRef + atr * 3)  // 3× ATR or BB upper
+      tp1Price = entryRef + atr * 2
+      tp2Price = entryRef + atr * 3.5  // 3.5× ATR，永遠比 tp1 大
     } else if (direction === 'short') {
       slPrice = entryHigh + atr * 0.8
       tp1Price = entryRef - atr * 2
-      tp2Price = Math.min(bbLower, entryRef - atr * 3)
+      tp2Price = entryRef - atr * 3.5
     } else {
       slPrice = p - atr * 1.5
       tp1Price = p + atr * 2
       tp2Price = p + atr * 3.5
     }
 
-    const risk = Math.abs(entryRef - slPrice)
-    const reward1 = Math.abs(tp1Price - entryRef)
-    const reward2 = Math.abs(tp2Price - entryRef)
+    const risk = Math.abs(entryRef - slPrice)        // 進場點 → 止損
+    const reward1 = Math.abs(tp1Price - entryRef)    // 進場點 → 止盈1
+    const reward2 = Math.abs(tp2Price - entryRef)    // 進場點 → 止盈2
     const rr1 = (reward1 / (risk || 1)).toFixed(1)
     const rr2 = (reward2 / (risk || 1)).toFixed(1)
 

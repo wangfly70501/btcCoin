@@ -74,32 +74,36 @@
       </div>
 
       <!-- 盈虧比 -->
-      <div class="rr-row">
-        <div class="rr-item">
-          <span class="rr-label">風險</span>
-          <span class="rr-val red">${{ fp(plan.risk) }}</span>
+      <div class="rr-section">
+        <div class="rr-title">盈虧比計算（以進場區中點為基準）</div>
+        <div class="rr-ref">進場點參考：${{ fp((plan.entryZone.low + plan.entryZone.high) / 2) }}</div>
+        <div class="rr-row">
+          <div class="rr-item">
+            <span class="rr-label">風險</span>
+            <span class="rr-val red">-${{ fp(plan.risk) }}</span>
+          </div>
+          <div class="rr-divider">vs</div>
+          <div class="rr-item">
+            <span class="rr-label">止盈1 報酬</span>
+            <span class="rr-val green">+${{ fp(plan.reward1) }}</span>
+          </div>
+          <div class="rr-badge" :class="parseFloat(plan.rr1) >= 2 ? 'good' : parseFloat(plan.rr1) >= 1.5 ? 'ok' : 'bad'">
+            R:R = 1:{{ plan.rr1 }}
+          </div>
         </div>
-        <div class="rr-divider">→</div>
-        <div class="rr-item">
-          <span class="rr-label">報酬1</span>
-          <span class="rr-val green">${{ fp(plan.reward1) }}</span>
-        </div>
-        <div class="rr-badge" :class="parseFloat(plan.rr1) >= 2 ? 'good' : parseFloat(plan.rr1) >= 1.5 ? 'ok' : 'bad'">
-          R:R = 1:{{ plan.rr1 }}
-        </div>
-      </div>
-      <div class="rr-row">
-        <div class="rr-item">
-          <span class="rr-label">風險</span>
-          <span class="rr-val red">${{ fp(plan.risk) }}</span>
-        </div>
-        <div class="rr-divider">→</div>
-        <div class="rr-item">
-          <span class="rr-label">報酬2</span>
-          <span class="rr-val accent">${{ fp(plan.reward2) }}</span>
-        </div>
-        <div class="rr-badge" :class="parseFloat(plan.rr2) >= 2 ? 'good' : parseFloat(plan.rr2) >= 1.5 ? 'ok' : 'bad'">
-          R:R = 1:{{ plan.rr2 }}
+        <div class="rr-row">
+          <div class="rr-item">
+            <span class="rr-label">風險</span>
+            <span class="rr-val red">-${{ fp(plan.risk) }}</span>
+          </div>
+          <div class="rr-divider">vs</div>
+          <div class="rr-item">
+            <span class="rr-label">止盈2 報酬</span>
+            <span class="rr-val accent">+${{ fp(plan.reward2) }}</span>
+          </div>
+          <div class="rr-badge" :class="parseFloat(plan.rr2) >= 2 ? 'good' : parseFloat(plan.rr2) >= 1.5 ? 'ok' : 'bad'">
+            R:R = 1:{{ plan.rr2 }}
+          </div>
         </div>
       </div>
 
@@ -238,6 +242,9 @@ const summaryText = computed(() => {
 .green { color: var(--green); }
 .accent { color: var(--accent); }
 
+.rr-section { margin-bottom: 10px; }
+.rr-title { font-size: 0.72rem; letter-spacing: 1px; color: var(--dim); margin-bottom: 4px; text-transform: uppercase; }
+.rr-ref { font-family: var(--mono); font-size: 0.85rem; color: var(--accent); margin-bottom: 8px; }
 .rr-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
 .rr-item { display: flex; flex-direction: column; gap: 1px; }
 .rr-label { font-size: 0.7rem; color: var(--dim); }
