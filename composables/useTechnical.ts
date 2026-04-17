@@ -214,48 +214,51 @@ export function useTechnical() {
 
     // ── Trade Plan ────────────────────────────────────────
     const atr = calcATR(klines, 14)
-    const atrMult = 1.5
 
-    // Entry zone: wait for pullback to EMA50 area
+    // Entry zone: EMA50 area (wait for pullback)
     const entryLow = Math.min(ema50, ema20) * 0.999
     const entryHigh = Math.max(ema50, ema20) * 1.001
 
-    // ATR-based SL/TP
+    // Use entry zone midpoint as reference for SL/TP calculation
+    // This gives realistic R:R based on WHERE you should enter, not current price
+    const entryRef = (entryLow + entryHigh) / 2
+
     let slPrice: number, tp1Price: number, tp2Price: number
     let direction: 'long' | 'short' | 'wait' = signal.cls
 
     if (direction === 'long') {
-      slPrice = ema200 - atr * 0.5  // below EMA200
-      tp1Price = p + atr * 2        // 2x ATR
-      tp2Price = bbUpper            // BB upper band
+      // SL = 1×ATR below entry zone (tight but outside noise)
+      slPrice = entryLow - atr * 0.8
+      tp1Price = entryRef + atr * 2    // 2× ATR reward
+      tp2Price = Math.max(bbUpper, entryRef + atr * 3)  // 3× ATR or BB upper
     } else if (direction === 'short') {
-      slPrice = ema200 + atr * 0.5
-      tp1Price = p - atr * 2
-      tp2Price = bbLower
+      slPrice = entryHigh + atr * 0.8
+      tp1Price = entryRef - atr * 2
+      tp2Price = Math.min(bbLower, entryRef - atr * 3)
     } else {
-      slPrice = p - atr * atrMult
+      slPrice = p - atr * 1.5
       tp1Price = p + atr * 2
-      tp2Price = p + atr * 4
+      tp2Price = p + atr * 3.5
     }
 
-    const risk = Math.abs(p - slPrice)
-    const reward1 = Math.abs(tp1Price - p)
-    const reward2 = Math.abs(tp2Price - p)
-    const rr1 = (reward1 / risk).toFixed(1)
-    const rr2 = (reward2 / risk).toFixed(1)
+    const risk = Math.abs(entryRef - slPrice)
+    const reward1 = Math.abs(tp1Price - entryRef)
+    const reward2 = Math.abs(tp2Price - entryRef)
+    const rr1 = (reward1 / (risk || 1)).toFixed(1)
+    const rr2 = (reward2 / (risk || 1)).toFixed(1)
 
     // Entry reason
     let entryReason = ''
     let waitReason = ''
     if (direction === 'long') {
       if (p > entryHigh * 1.005) {
-        waitReason = `等回測 EMA 支撐區 $${Math.round(entryLow).toLocaleString()} - $${Math.round(entryHigh).toLocaleString()} 再進場，勿追高`
+        waitReason = `等回測 EMA 支撐區 $${Math.round(entryLow).toLocaleString()} — $${Math.round(entryHigh).toLocaleString()} 再進場，勿追高`
       } else {
         entryReason = `現價接近 EMA 支撐區，可考慮進場`
       }
     } else if (direction === 'short') {
       if (p < entryLow * 0.995) {
-        waitReason = `等反彈至 EMA 壓力區 $${Math.round(entryLow).toLocaleString()} - $${Math.round(entryHigh).toLocaleString()} 再做空，勿追空`
+        waitReason = `等反彈至 EMA 壓力區 $${Math.round(entryLow).toLocaleString()} — $${Math.round(entryHigh).toLocaleString()} 再做空，勿追空`
       } else {
         entryReason = `現價接近 EMA 壓力區，可考慮做空`
       }
