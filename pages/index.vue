@@ -73,6 +73,13 @@
           />
         </div>
 
+        <!-- Trade Plan -->
+        <TradePlan
+          :plan="tradePlan"
+          :mtf-signals="mtfSignals"
+          :fp="fp"
+        />
+
         <!-- Chart -->
         <div class="panel">
           <div class="ptitle">蠟燭圖 · {{ tfLabel }} (近100根)</div>
@@ -210,6 +217,7 @@ const {
   fundingRate, openInterest, lsRatio, indexPrice, fearGreed,
   isLive, loading, klines, closes,
   indicators, signal, bulls, bears,
+  tradePlan, mtfSignals,
   signalLog, toast, position, nextUpdate,
   fp, fb, changeSymbol, changeTimeframe,
   openPosition, closePosition,

@@ -50,6 +50,29 @@ export interface LogEntry {
   time: string
 }
 
+export interface TradePlan {
+  direction: 'long' | 'short' | 'wait'
+  trend: string
+  entryZone: { low: number; high: number }
+  sl: number
+  tp1: number
+  tp2: number
+  risk: number
+  reward1: number
+  reward2: number
+  rr1: string
+  rr2: string
+  atr: number
+  waitReason: string
+  entryReason: string
+}
+
+export interface MTFSignal {
+  timeframe: string
+  label: string
+  cls: 'long' | 'short' | 'wait'
+  conf: number
+}
 export interface SymbolInfo {
   symbol: string
   baseAsset: string

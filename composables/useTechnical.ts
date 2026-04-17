@@ -1,4 +1,4 @@
-import type { Kline, Indicator, Signal } from '~/types'
+import type { Kline, Indicator, Signal, TradePlan } from '~/types'
 
 export function useTechnical() {
   function calcRSI(closes: number[], period = 14): number {
@@ -20,6 +20,22 @@ export function useTechnical() {
     let ema = closes.slice(0, period).reduce((a, b) => a + b, 0) / period
     for (let i = period; i < closes.length; i++) ema = closes[i] * k + ema * (1 - k)
     return ema
+  }
+
+  function calcATR(klines: Kline[], period = 14): number {
+    if (klines.length < period + 1) return 0
+    const trs: number[] = []
+    for (let i = 1; i < klines.length; i++) {
+      const k = klines[i], prev = klines[i - 1]
+      const tr = Math.max(
+        k.high - k.low,
+        Math.abs(k.high - prev.close),
+        Math.abs(k.low - prev.close)
+      )
+      trs.push(tr)
+    }
+    const recent = trs.slice(-period)
+    return recent.reduce((a, b) => a + b, 0) / period
   }
 
   function calcMACD(closes: number[]): { macd: number; signal: number; hist: number } {
@@ -63,13 +79,14 @@ export function useTechnical() {
     signal: Signal
     bulls: number
     bears: number
+    tradePlan: TradePlan
   } {
     const closes = klines.map(k => k.close)
     const p = price || closes[closes.length - 1]
 
     const rsiV = calcRSI(closes, 14)
     const { hist: macdHist, macd: macdV } = calcMACD(closes)
-    const { pos: bbPos } = calcBB(closes, 20)
+    const { pos: bbPos, upper: bbUpper, lower: bbLower } = calcBB(closes, 20)
     const ema20 = calcEMA(closes, 20)
     const ema50 = calcEMA(closes, Math.min(50, closes.length))
     const ema200 = calcEMA(closes, Math.min(200, closes.length))
@@ -195,8 +212,76 @@ export function useTechnical() {
       }
     }
 
-    return { indicators, signal, bulls, bears }
+    // ── Trade Plan ────────────────────────────────────────
+    const atr = calcATR(klines, 14)
+    const atrMult = 1.5
+
+    // Entry zone: wait for pullback to EMA50 area
+    const entryLow = Math.min(ema50, ema20) * 0.999
+    const entryHigh = Math.max(ema50, ema20) * 1.001
+
+    // ATR-based SL/TP
+    let slPrice: number, tp1Price: number, tp2Price: number
+    let direction: 'long' | 'short' | 'wait' = signal.cls
+
+    if (direction === 'long') {
+      slPrice = ema200 - atr * 0.5  // below EMA200
+      tp1Price = p + atr * 2        // 2x ATR
+      tp2Price = bbUpper            // BB upper band
+    } else if (direction === 'short') {
+      slPrice = ema200 + atr * 0.5
+      tp1Price = p - atr * 2
+      tp2Price = bbLower
+    } else {
+      slPrice = p - atr * atrMult
+      tp1Price = p + atr * 2
+      tp2Price = p + atr * 4
+    }
+
+    const risk = Math.abs(p - slPrice)
+    const reward1 = Math.abs(tp1Price - p)
+    const reward2 = Math.abs(tp2Price - p)
+    const rr1 = (reward1 / risk).toFixed(1)
+    const rr2 = (reward2 / risk).toFixed(1)
+
+    // Entry reason
+    let entryReason = ''
+    let waitReason = ''
+    if (direction === 'long') {
+      if (p > entryHigh * 1.005) {
+        waitReason = `等回測 EMA 支撐區 $${Math.round(entryLow).toLocaleString()} - $${Math.round(entryHigh).toLocaleString()} 再進場，勿追高`
+      } else {
+        entryReason = `現價接近 EMA 支撐區，可考慮進場`
+      }
+    } else if (direction === 'short') {
+      if (p < entryLow * 0.995) {
+        waitReason = `等反彈至 EMA 壓力區 $${Math.round(entryLow).toLocaleString()} - $${Math.round(entryHigh).toLocaleString()} 再做空，勿追空`
+      } else {
+        entryReason = `現價接近 EMA 壓力區，可考慮做空`
+      }
+    } else {
+      waitReason = '多空訊號混雜，等待明確方向再進場'
+    }
+
+    const tradePlan: TradePlan = {
+      direction,
+      trend: p > ema200 ? '主趨勢多頭' : '主趨勢空頭',
+      entryZone: { low: entryLow, high: entryHigh },
+      sl: slPrice,
+      tp1: tp1Price,
+      tp2: tp2Price,
+      risk,
+      reward1,
+      reward2,
+      rr1,
+      rr2,
+      atr,
+      waitReason,
+      entryReason,
+    }
+
+    return { indicators, signal, bulls, bears, tradePlan }
   }
 
-  return { calcRSI, calcEMA, calcMACD, calcBB, analyse }
+  return { calcRSI, calcEMA, calcMACD, calcBB, calcATR, analyse }
 }

@@ -1,4 +1,4 @@
-import type { Kline, Signal, Indicator, Position, LogEntry, Timeframe } from '~/types'
+import type { Kline, Signal, Indicator, Position, LogEntry, Timeframe, TradePlan, MTFSignal } from '~/types'
 import { TIMEFRAMES } from '~/types'
 
 let logId = 0
@@ -32,6 +32,8 @@ export function useTrading() {
   const bulls = ref(5)
   const bears = ref(0)
   const lastSigCls = ref('')
+  const tradePlan = ref<TradePlan | null>(null)
+  const mtfSignals = ref<MTFSignal[]>([])
 
   // Log / Toast
   const signalLog = ref<LogEntry[]>([])
@@ -90,6 +92,7 @@ export function useTrading() {
     indicators.value = result.indicators
     bulls.value = result.bulls
     bears.value = result.bears
+    tradePlan.value = result.tradePlan
 
     const ns = result.signal
     signal.value = ns
@@ -108,6 +111,37 @@ export function useTrading() {
         showToast('warn', `🔔 訊號反轉！考慮止盈或平倉`)
       }
     }
+  }
+
+  // ── MTF Analysis ───────────────────────────────────────
+  async function loadMTF() {
+    const tfList: Timeframe[] = ['15m', '1h', '4h']
+    const results: MTFSignal[] = []
+    for (const tf of tfList) {
+      if (tf === timeframe.value) {
+        // 用當前已有資料
+        const s = signal.value
+        results.push({
+          timeframe: tf,
+          label: s.label,
+          cls: s.cls,
+          conf: s.conf,
+        })
+        continue
+      }
+      try {
+        const data = await fetchKlines(symbol.value, tf, 60)
+        if (data.length < 20) continue
+        const r = analyse(data, price.value, lsRatio.value, fundingRate.value, fearGreed.value)
+        results.push({
+          timeframe: tf,
+          label: r.signal.label,
+          cls: r.signal.cls,
+          conf: r.signal.conf,
+        })
+      } catch { /* skip */ }
+    }
+    mtfSignals.value = results
   }
 
   // ── Position ───────────────────────────────────────────
@@ -323,6 +357,7 @@ export function useTrading() {
     connectPriceWS()
     loading.value = false
     runAnalysis()
+    loadMTF()
   }
 
   async function changeSymbol(newSymbol: string) {
@@ -334,11 +369,11 @@ export function useTrading() {
   }
 
   async function changeTimeframe(tf: Timeframe) {
-    if (tf === timeframe.value) return // 同週期不重載
+    if (tf === timeframe.value) return
     timeframe.value = tf
     loading.value = true
     const ok = await loadKlines()
-    if (ok) runAnalysis()
+    if (ok) { runAnalysis(); loadMTF() }
     loading.value = false
   }
 
@@ -372,19 +407,14 @@ export function useTrading() {
   })
 
   return {
-    // state
     symbol, timeframe, price, priceDir, change24h, volume24h,
     fundingRate, openInterest, lsRatio, indexPrice, fearGreed,
     isLive, loading, klines, closes,
-    // analysis
     indicators, signal, bulls, bears,
-    // log/toast
+    tradePlan, mtfSignals,
     signalLog, toast,
-    // position
     position,
-    // countdown
     nextUpdate,
-    // methods
     fp, fb, changeSymbol, changeTimeframe,
     openPosition, closePosition, runAnalysis,
   }
