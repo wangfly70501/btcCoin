@@ -157,25 +157,25 @@ export function useTechnical() {
     ]
 
     let signal: Signal
-    if (score >= 4) {
+    if (score >= 3) {
       signal = {
         cls: 'long',
         arrow: '▲',
-        label: score >= 6 ? '強力做多' : '建議做多',
+        label: score >= 5 ? '強力做多' : '建議做多',
         conf,
-        strength: score >= 6 ? '高信心 — 多頭趨勢明確' : '中等信心 — 偏多格局',
+        strength: score >= 5 ? '高信心 — 多頭趨勢明確' : '中等信心 — 偏多格局',
         reasons,
         entry: p,
         tp: p * 1.02,
         sl: p * 0.992,
       }
-    } else if (score <= -4) {
+    } else if (score <= -3) {
       signal = {
         cls: 'short',
         arrow: '▼',
-        label: score <= -6 ? '強力做空' : '建議做空',
+        label: score <= -5 ? '強力做空' : '建議做空',
         conf,
-        strength: score <= -6 ? '高信心 — 空頭趨勢明確' : '中等信心 — 偏空格局',
+        strength: score <= -5 ? '高信心 — 空頭趨勢明確' : '中等信心 — 偏空格局',
         reasons,
         entry: p,
         tp: p * 0.98,

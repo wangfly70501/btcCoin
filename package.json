@@ -8,6 +8,9 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview"
   },
+  "dependencies": {
+    "lightweight-charts": "^4.2.0"
+  },
   "devDependencies": {
     "nuxt": "^3.13.0",
     "vue": "^3.4.0",

@@ -75,8 +75,8 @@
 
         <!-- Chart -->
         <div class="panel">
-          <div class="ptitle">K線走勢 · {{ tfLabel }} (近100根)</div>
-          <PriceChart :closes="closes" />
+          <div class="ptitle">蠟燭圖 · {{ tfLabel }} (近100根)</div>
+          <PriceChart :closes="closes" :klines="klines" :timeframe="timeframe" />
         </div>
 
         <!-- Indicators -->
@@ -208,7 +208,7 @@
 const {
   symbol, timeframe, price, priceDir, change24h, volume24h,
   fundingRate, openInterest, lsRatio, indexPrice, fearGreed,
-  isLive, loading, closes,
+  isLive, loading, klines, closes,
   indicators, signal, bulls, bears,
   signalLog, toast, position, nextUpdate,
   fp, fb, changeSymbol, changeTimeframe,

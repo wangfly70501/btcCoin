@@ -25,7 +25,7 @@ export function useBinance() {
         high: parseFloat(k[2]),
         low: parseFloat(k[3]),
         close: parseFloat(k[4]),
-        volume: parseFloat(k[5]),
+        volume: parseFloat(k[7]),  // k[7] = Quote asset volume (USDT)，比 k[5] base volume 更直觀
         closeTime: k[6],
       }))
     } catch { return [] }

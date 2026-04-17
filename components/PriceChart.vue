@@ -1,68 +1,238 @@
 <template>
-  <div class="chart-wrap">
-    <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" class="chart-svg">
+  <div class="chart-outer">
+    <div v-if="!props.klines || props.klines.length === 0" class="chart-loading">
+      <span class="spin" />載入K線中...
+    </div>
+    <svg v-else
+      :viewBox="`0 0 1000 ${PH + VH + 24}`"
+      preserveAspectRatio="xMidYMid meet"
+      class="chart-svg"
+      xmlns="http://www.w3.org/2000/svg"
+    >
       <defs>
-        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" :stop-color="color" stop-opacity="0.28" />
-          <stop offset="100%" :stop-color="color" stop-opacity="0" />
-        </linearGradient>
+        <clipPath id="priceClip">
+          <rect :x="PL" y="0" :width="CW" :height="PH" />
+        </clipPath>
+        <clipPath id="volClip">
+          <rect :x="PL" :y="PH + 2" :width="CW" :height="VH" />
+        </clipPath>
       </defs>
-      <!-- grid -->
-      <line v-for="i in 4" :key="'h'+i"
-        x1="0" :y1="H/4*i" :x2="W" :y2="H/4*i"
-        stroke="#1a2d4a" stroke-width="0.5" />
-      <!-- price labels -->
-      <text v-for="i in 4" :key="'l'+i"
-        :x="W - 3" :y="H/4*i - 3"
-        font-size="9" fill="#4a6080" text-anchor="end" font-family="monospace">
-        ${{ Math.round(yMax - (yRange / 4) * i).toLocaleString() }}
-      </text>
-      <!-- fill -->
-      <path v-if="fillPath" :d="fillPath" fill="url(#chartGrad)" />
-      <!-- line -->
-      <path v-if="linePath" :d="linePath" :stroke="color" stroke-width="1.8" fill="none" />
-      <!-- current dot -->
-      <circle v-if="closes.length > 1"
-        :cx="W" :cy="pY(closes[closes.length-1])" r="3.5" :fill="color"
-        :style="`filter: drop-shadow(0 0 5px ${color})`" />
+
+      <!-- === PRICE AREA === -->
+      <!-- Background -->
+      <rect x="0" y="0" width="1000" :height="PH" fill="#0d1421" />
+
+      <!-- Grid lines -->
+      <g v-for="i in 5" :key="'g'+i">
+        <line
+          :x1="PL" :y1="gridY(i)" :x2="PL + CW" :y2="gridY(i)"
+          stroke="#1a2d4a" stroke-width="0.5" stroke-dasharray="3,4"
+        />
+        <text
+          :x="PL + CW + 6" :y="gridY(i) + 4"
+          font-size="14" fill="#4a6080" font-family="monospace" text-anchor="start"
+        >{{ fmtP(gridPrice(i)) }}</text>
+      </g>
+
+      <!-- Candles (clipped) -->
+      <g clip-path="url(#priceClip)">
+        <g v-for="(k, i) in safeKlines" :key="'c'+i">
+          <!-- Wick -->
+          <line
+            :x1="cX(i)" :y1="pY(k.high)"
+            :x2="cX(i)" :y2="pY(k.low)"
+            :stroke="k.close >= k.open ? '#00ff88' : '#ff3366'"
+            stroke-width="1"
+          />
+          <!-- Body -->
+          <rect
+            :x="cX(i) - bW/2"
+            :y="pY(Math.max(k.open, k.close))"
+            :width="bW"
+            :height="Math.max(Math.abs(pY(k.open) - pY(k.close)), 1)"
+            :fill="k.close >= k.open ? 'none' : '#ff3366'"
+            :stroke="k.close >= k.open ? '#00ff88' : '#ff3366'"
+            stroke-width="1"
+          />
+        </g>
+      </g>
+
+      <!-- Current price line -->
+      <line v-if="safeKlines.length"
+        :x1="PL" :y1="pY(lastClose)"
+        :x2="PL + CW" :y2="pY(lastClose)"
+        :stroke="lastClose >= safeKlines[0].close ? '#00ff88' : '#ff3366'"
+        stroke-width="1" stroke-dasharray="4,3"
+      />
+      <text v-if="safeKlines.length"
+        :x="PL + CW + 6" :y="pY(lastClose) + 5"
+        font-size="14" :fill="lastClose >= safeKlines[0].close ? '#00ff88' : '#ff3366'"
+        font-family="monospace" font-weight="bold"
+      >${{ Math.round(lastClose).toLocaleString() }}</text>
+
+      <!-- === VOLUME AREA === -->
+      <rect x="0" :y="PH + 2" width="1000" :height="VH + 22" fill="#090e18" />
+
+      <!-- VOL label -->
+      <text :x="PL" :y="PH + 16" font-size="12" fill="#4a6080" font-family="monospace">VOL</text>
+      <text :x="PL + CW + 6" :y="PH + 16" font-size="12" fill="#4a6080" font-family="monospace">{{ fmtV(volMax) }}</text>
+
+      <!-- Volume bars (clipped) -->
+      <g clip-path="url(#volClip)">
+        <rect
+          v-for="(k, i) in safeKlines" :key="'v'+i"
+          :x="cX(i) - bW/2"
+          :y="PH + 2 + VH - vH(k.volume)"
+          :width="bW"
+          :height="vH(k.volume)"
+          :fill="k.close >= k.open ? 'rgba(0,255,136,0.5)' : 'rgba(255,51,102,0.5)'"
+        />
+      </g>
+
+      <!-- Vol MA20 -->
+      <polyline v-if="volMA.length"
+        :points="volMA.map((y, i) => `${cX(i + 19)},${y}`).join(' ')"
+        fill="none" stroke="rgba(255,215,0,0.7)" stroke-width="1"
+      />
+
+      <!-- === DATE AXIS === -->
+      <rect x="0" :y="PH + VH + 4" width="1000" height="20" fill="#080c14" />
+      <g v-for="(lb, i) in dateLabels" :key="'d'+i">
+        <text
+          :x="lb.x" :y="PH + VH + 18"
+          font-size="12" fill="#4a6080" font-family="monospace" text-anchor="middle"
+        >{{ lb.text }}</text>
+      </g>
+
     </svg>
   </div>
 </template>
 
 <script setup lang="ts">
-const props = defineProps<{ closes: number[] }>()
+import type { Kline, Timeframe } from '~/types'
 
-const W = 600
-const H = 200
+const props = defineProps<{
+  closes: number[]
+  klines: Kline[]
+  timeframe: Timeframe
+}>()
 
-const yMin = computed(() => props.closes.length ? Math.min(...props.closes) : 0)
-const yMax = computed(() => props.closes.length ? Math.max(...props.closes) : 1)
-const yRange = computed(() => Math.max(yMax.value - yMin.value, 1))
+// Layout constants (SVG coordinate space = 1000px wide)
+const PH = 280   // price area height
+const VH = 56    // volume area height
+const PL = 6     // padding left
+const PR = 90    // padding right (加寬給大字)
+const CW = 1000 - PL - PR  // chart width
 
-const color = computed(() => {
-  if (props.closes.length < 2) return '#00d4ff'
-  return props.closes[props.closes.length - 1] >= props.closes[0] ? '#00ff88' : '#ff3366'
+const safeKlines = computed(() => {
+  const k = props.klines
+  return Array.isArray(k) && k.length > 0 ? k : []
 })
+const n = computed(() => safeKlines.value.length)
 
+// Price range
+const yMax = computed(() => n.value ? Math.max(...safeKlines.value.map(k => k.high)) * 1.001 : 1)
+const yMin = computed(() => n.value ? Math.min(...safeKlines.value.map(k => k.low)) * 0.999 : 0)
+const yRng = computed(() => Math.max(yMax.value - yMin.value, 1))
+
+// Volume range
+const volMax = computed(() => n.value ? Math.max(...safeKlines.value.map(k => k.volume), 1) : 1)
+
+// Last close
+const lastClose = computed(() => safeKlines.value.length ? safeKlines.value[safeKlines.value.length - 1].close : 0)
+
+// Candle bar width
+const bW = computed(() => n.value > 1 ? Math.max(CW / n.value * 0.65, 1) : 4)
+
+// X position of candle i
+function cX(i: number) {
+  if (n.value < 2) return PL
+  return PL + (i / (n.value - 1)) * CW
+}
+
+// Y position of price p
 function pY(p: number) {
-  return H - ((p - yMin.value) / yRange.value) * (H - 24) - 6
-}
-function pX(i: number) {
-  return props.closes.length < 2 ? 0 : (i / (props.closes.length - 1)) * W
+  return 8 + (1 - (p - yMin.value) / yRng.value) * (PH - 16)
 }
 
-const linePath = computed(() => {
-  if (props.closes.length < 2) return ''
-  return props.closes.map((p, i) => `${i === 0 ? 'M' : 'L'}${pX(i).toFixed(1)},${pY(p).toFixed(1)}`).join(' ')
+// Volume bar height
+function vH(v: number) {
+  return Math.max((v / volMax.value) * (VH - 4), 1)
+}
+
+// Grid
+function gridY(i: number) { return 8 + (i / 5) * (PH - 16) }
+function gridPrice(i: number) { return yMax.value - (i / 5) * yRng.value }
+
+// Format helpers
+function fmtP(v: number) {
+  return v >= 1000 ? '$' + Math.round(v).toLocaleString() : '$' + v.toFixed(2)
+}
+function fmtV(v: number) {
+  return v >= 1e9 ? (v/1e9).toFixed(1)+'B' : v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0)
+}
+
+// Volume MA20
+const volMA = computed(() => {
+  if (n.value < 20) return []
+  const result: number[] = []
+  for (let i = 19; i < n.value; i++) {
+    const avg = safeKlines.value.slice(i - 19, i + 1).reduce((s, k) => s + k.volume, 0) / 20
+    result.push(PH + 2 + VH - vH(avg))
+  }
+  return result
 })
-const fillPath = computed(() => {
-  if (props.closes.length < 2) return ''
-  const last = props.closes.length - 1
-  return linePath.value + ` L${pX(last).toFixed(1)},${H} L0,${H} Z`
+
+// Date labels
+const dateLabels = computed(() => {
+  if (n.value < 2) return []
+  const labels: { x: number; text: string }[] = []
+  const step = Math.max(Math.floor(n.value / 6), 1)
+  const shown = new Set<string>()
+
+  const fmt = (ts: number) => {
+    const d = new Date(ts)
+    const mo = d.getMonth() + 1, da = d.getDate()
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mm = String(d.getMinutes()).padStart(2, '0')
+    if (props.timeframe === '1d') return `${mo}/${da}`
+    if (['12h','8h','4h'].includes(props.timeframe)) return `${mo}/${da} ${hh}h`
+    return `${mo}/${da} ${hh}:${mm}`
+  }
+
+  for (let i = 0; i < n.value; i += step) {
+    const text = fmt(safeKlines.value[i].openTime)
+    if (shown.has(text)) continue
+    shown.add(text)
+    labels.push({ x: cX(i), text })
+  }
+  // Always last
+  const lastText = fmt(safeKlines.value[n.value - 1].openTime)
+  if (!shown.has(lastText)) labels.push({ x: cX(n.value - 1), text: lastText })
+  return labels
 })
 </script>
 
 <style scoped>
-.chart-wrap { width: 100%; overflow: hidden; }
-.chart-svg { width: 100%; height: 200px; display: block; }
+.chart-outer { width: 100%; }
+.chart-svg { width: 100%; height: auto; display: block; }
+.chart-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #4a6080;
+  font-size: 0.9rem;
+  font-family: monospace;
+  padding: 40px 20px;
+  height: 200px;
+  justify-content: center;
+}
+.spin {
+  width: 16px; height: 16px;
+  border: 2px solid #1a2d4a;
+  border-top-color: #00d4ff;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  display: inline-block;
+}
 </style>
